@@ -261,6 +261,44 @@ static void alx_set_msglevel(struct net_device *netdev, u32 data)
 	alx->msg_enable = data;
 }
 
+//readd WoL support from 3.10.50 kernel (2016/04/29)
+static void alx_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
+{
+	struct alx_priv *alx = netdev_priv(netdev);
+	struct alx_hw *hw = &alx->hw;
+
+	wol->supported = WAKE_MAGIC | WAKE_PHY;
+	wol->wolopts = 0;
+
+
+	if (hw->sleep_ctrl & ALX_SLEEP_WOL_MAGIC)
+		wol->wolopts |= WAKE_MAGIC;
+	if (hw->sleep_ctrl & ALX_SLEEP_WOL_PHY)
+		wol->wolopts |= WAKE_PHY;
+}
+
+//readd WoL support from 3.10.50 kernel (2016/04/29)
+static int alx_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
+{
+	struct alx_priv *alx = netdev_priv(netdev);
+	struct alx_hw *hw = &alx->hw;
+
+	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE |
+			    WAKE_UCAST | WAKE_BCAST | WAKE_MCAST))
+		return -EOPNOTSUPP;
+
+	hw->sleep_ctrl = 0;
+
+	if (wol->wolopts & WAKE_MAGIC)
+		hw->sleep_ctrl |= ALX_SLEEP_WOL_MAGIC;
+	if (wol->wolopts & WAKE_PHY)
+		hw->sleep_ctrl |= ALX_SLEEP_WOL_PHY;
+
+	device_set_wakeup_enable(&alx->hw.pdev->dev, hw->sleep_ctrl);
+
+	return 0;
+}
+
 static void alx_get_ethtool_stats(struct net_device *netdev,
 				  struct ethtool_stats *estats, u64 *data)
 {
@@ -306,6 +344,9 @@ const struct ethtool_ops alx_ethtool_ops = {
 	.set_pauseparam	= alx_set_pauseparam,
 	.get_msglevel	= alx_get_msglevel,
 	.set_msglevel	= alx_set_msglevel,
+	//readd WoL support from 3.10.50 kernel (2016/04/29)
+	.get_wol	= alx_get_wol,
+	.set_wol	= alx_set_wol,
 	.get_link	= ethtool_op_get_link,
 	.get_strings	= alx_get_strings,
 	.get_sset_count	= alx_get_sset_count,
